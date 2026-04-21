@@ -29,9 +29,11 @@ import { format, addDays, subDays, parseISO } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { extractDayEndPayouts } from "@/lib/dayEndPayouts";
+import { extractDayEndDebtors } from "@/lib/dayEndDebtors";
 
 const DAY_END_PAYOUTS_CUTOFF = "2026-04-01";
 const DAY_END_PAYOUT_VENDOR = "Day End Payouts";
+const DAY_END_DEBTORS_CUTOFF = "2026-04-01";
 
 const blankShopShift = (terminals: string[]): DailyCashup["shop"] => ({
   income: 0,
