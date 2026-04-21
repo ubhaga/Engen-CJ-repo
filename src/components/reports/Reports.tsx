@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useCashupStore } from '@/store/cashupStore';
+import { useMasterDataStore } from '@/store/masterDataStore';
 import { supabase } from '@/integrations/supabase/client';
 import { CurrencyDisplay } from '@/components/ui/CashupUI';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import { DebtorsRecon } from '@/components/recons/DebtorsRecon';
 
 export function Reports({ mode = 'reports', onNavigateToDate }: { mode?: 'reports' | 'recons'; onNavigateToDate?: (date: string) => void }) {
   const { cashups, managerEntries } = useCashupStore();
+  const { speedpointTerminals } = useMasterDataStore();
   const [filterMonth, setFilterMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const monthCashups = cashups.filter(c => c.month === filterMonth);
@@ -249,8 +251,13 @@ export function Reports({ mode = 'reports', onNavigateToDate }: { mode?: 'report
   );
   const receiptsTotal = receiptsReport.reduce((s, r) => s + r.amount, 0);
 
-  // Speedpoints report — one row per date, columns per terminal
-  const SP_TERMINALS = ['Term 247608', 'Forecourt 929661', 'Retail 200660', 'Scan to pay'];
+  // Speedpoints report — one row per date, columns per terminal.
+  // Recon set excludes terminals without a bank match pattern (e.g. V Plus, Scan-to-pay variants
+  // that don't show up on the bank statement). Settings → Speedpoint Terminals controls the list.
+  const SP_TERMINALS = useMemo(
+    () => speedpointTerminals.filter(t => t.bankPattern.trim() !== '').map(t => t.name),
+    [speedpointTerminals]
+  );
   const [selectedTerminal, setSelectedTerminal] = useState<string>('all');
   const visibleTerminals = selectedTerminal === 'all' ? SP_TERMINALS : [selectedTerminal];
   type SpDateRow = {
