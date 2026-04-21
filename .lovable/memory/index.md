@@ -44,3 +44,4 @@
 - [AFS JE2 Invoices Logic](mem://logic/afs/je2-invoices-logic) — 3-column debit structure (Excl. VAT, VAT, No VAT) and category aggregation
 - [AFS JE3 Writeoffs Logic](mem://logic/afs/je3-writeoffs-logic) — Debtors account write-off mapping for Generator, Shop Expense, Staff Refreshments
 - [Fuel Recon](mem://features/fuel-recon) — 4 sub-tabs parsing day-end RPTs for tank/meter/POS variance analysis, tank config in Settings
+- [Day End Debtors Auto-Fill](mem://features/day-end-debtors-autofill) — Section 7 MOP Account auto-populates from EOD Debtors Transactions on .rpt upload

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useCashupStore } from "@/store/cashupStore";
 import { RECEIPT_TYPES } from "@/data/masterData";
@@ -29,9 +29,11 @@ import { format, addDays, subDays, parseISO } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { extractDayEndPayouts } from "@/lib/dayEndPayouts";
+import { extractDayEndDebtors } from "@/lib/dayEndDebtors";
 
 const DAY_END_PAYOUTS_CUTOFF = "2026-04-01";
 const DAY_END_PAYOUT_VENDOR = "Day End Payouts";
+const DAY_END_DEBTORS_CUTOFF = "2026-04-01";
 
 const blankShopShift = (terminals: string[]): DailyCashup["shop"] => ({
   income: 0,
@@ -204,6 +206,60 @@ export function CashierDailyForm({ selectedDate, onDateChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useDayEndPayouts, dayEndPayoutsAmount, selectedDate]);
 
+  // From 1 April 2026 onwards: auto-populate Section 7 (MOP Account / Debtors)
+  // from the uploaded day-end report's "EOD Debtors Transactions" section.
+  // Lines remain editable; re-uploading the .rpt re-syncs them.
+  // Unknown account names are added to Master Data automatically.
+  const useDayEndDebtors = selectedDate >= DAY_END_DEBTORS_CUTOFF;
+  const addAccountToMaster = useMasterDataStore(s => s.addAccount);
+  const masterAccounts = useMasterDataStore(s => s.accounts);
+  // Track the upload's updated_at so we re-sync only when the report changes.
+  const lastSyncedRef = useRef<{ date: string; updatedAt: string } | null>(null);
+
+  useEffect(() => {
+    if (!useDayEndDebtors) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("day_end_uploads")
+        .select("content, updated_at")
+        .eq("date", selectedDate)
+        .maybeSingle();
+      if (cancelled || !data?.content) return;
+      const updatedAt = (data as { updated_at: string }).updated_at;
+      const last = lastSyncedRef.current;
+      // Skip if we've already synced this exact upload version for this date
+      if (last && last.date === selectedDate && last.updatedAt === updatedAt) return;
+      lastSyncedRef.current = { date: selectedDate, updatedAt };
+
+      const debtors = extractDayEndDebtors(data.content);
+      if (debtors.length === 0) return;
+
+      // Auto-add any new account names to Master Data (case-insensitive check)
+      const known = new Set(masterAccounts.map(a => a.toLowerCase()));
+      debtors.forEach(d => {
+        if (!known.has(d.accountName.toLowerCase())) {
+          addAccountToMaster(d.accountName);
+          known.add(d.accountName.toLowerCase());
+        }
+      });
+
+      // Replace Section 7 entries with the parsed debtors
+      setForm(f => ({
+        ...f,
+        shop: {
+          ...f.shop,
+          accounts: debtors.map(d => ({
+            id: uuidv4(),
+            name: d.accountName,
+            amount: d.amount,
+          })),
+        },
+      }));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, useDayEndDebtors, existing?.id]);
   // ---- CALCULATIONS ----
   const shopPayoutsTotal = form.shop.payouts.reduce((s, p) => s + p.amount, 0);
   const shopNetSales = form.shop.income - form.shop.returns - form.shop.returns_today;
