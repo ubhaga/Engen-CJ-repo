@@ -86,7 +86,7 @@ export default function Index() {
               <ClipboardList className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground">Shell Craighall Cashup System</h1>
+              <h1 className="text-lg font-bold text-foreground">{siteName} Cashup System</h1>
               <p className="text-xs text-muted-foreground">Daily Cashup & Reconciliation</p>
             </div>
           </div>
