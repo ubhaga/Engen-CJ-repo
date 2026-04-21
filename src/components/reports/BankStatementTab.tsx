@@ -338,9 +338,11 @@ export function BankStatementTab({ filterMonth, monthLabel }: Props) {
         <TableBody>
           {lines.length === 0 ? (
             <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No bank statement uploaded for this month.</TableCell></TableRow>
+          ) : visibleLines.length === 0 ? (
+            <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No lines match the active terminal filter.</TableCell></TableRow>
           ) : (
             <>
-              {lines.map(l => (
+              {visibleLines.map(l => (
                 <TableRow key={l.id} className={l.matched_terminal ? 'hover:bg-muted/30' : 'bg-muted/10 hover:bg-muted/30'}>
                   <TableCell className="text-sm font-mono">{l.transaction_date}</TableCell>
                   <TableCell className="text-sm max-w-[250px] truncate">{l.description}</TableCell>
