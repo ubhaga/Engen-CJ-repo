@@ -75,7 +75,7 @@ export function AfsMonthly({ selectedDate }: AfsMonthlyProps) {
   const cashups = useCashupStore((s) => s.cashups);
   const managerEntries = useCashupStore((s) => s.managerEntries);
   const monthlyFigures = useCashupStore((s) => s.monthlyFigures);
-  const { eftSuppliers } = useMasterDataStore();
+  const { eftSuppliers, speedpointTerminals } = useMasterDataStore();
 
   // Load bank lines + creditor opening balances
   const [bankLines, setBankLines] = useState<{ id: string; amount: number; description: string; transaction_date: string; matched_terminal: string }[]>([]);
