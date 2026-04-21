@@ -222,6 +222,16 @@ export function BankStatementTab({ filterMonth, monthLabel }: Props) {
   const unmatchedTotal = unmatchedLines.reduce((s, l) => s + l.amount, 0);
   const grandTotal = lines.reduce((s, l) => s + l.amount, 0);
 
+  // When a terminal filter is active (from Settings), restrict the displayed rows.
+  const visibleLines = useMemo(() => {
+    if (!terminalFilter) return lines;
+    let re: RegExp;
+    try { re = new RegExp(terminalFilter.pattern, 'i'); }
+    catch { re = new RegExp(terminalFilter.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); }
+    return lines.filter(l => re.test(l.description));
+  }, [lines, terminalFilter]);
+  const visibleTotal = visibleLines.reduce((s, l) => s + l.amount, 0);
+
   const exportCSV = () => {
     const headers = ['Date', 'Description', 'Amount', 'Matched Terminal', 'Allocation'];
     const rows = lines.map(l => {
