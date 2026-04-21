@@ -33,7 +33,7 @@ import { extractDayEndPayouts } from "@/lib/dayEndPayouts";
 const DAY_END_PAYOUTS_CUTOFF = "2026-04-01";
 const DAY_END_PAYOUT_VENDOR = "Day End Payouts";
 
-const blankShopShift = (): DailyCashup["shop"] => ({
+const blankShopShift = (terminals: string[]): DailyCashup["shop"] => ({
   income: 0,
   returns: 0,
   returns_today: 0,
@@ -45,12 +45,7 @@ const blankShopShift = (): DailyCashup["shop"] => ({
   easyPay: 0,
   deepFrozenCC: 0,
   coins: 0,
-  speedpoints: [
-    { terminal: "Term 247608", batchNo: "", shopAmount: 0, optAmount: 0 },
-    { terminal: "Forecourt 929661", batchNo: "", shopAmount: 0, optAmount: 0 },
-    { terminal: "Retail 200660", batchNo: "", shopAmount: 0, optAmount: 0 },
-    { terminal: "Scan to pay", batchNo: "", shopAmount: 0, optAmount: 0 },
-  ],
+  speedpoints: terminals.map((terminal) => ({ terminal, batchNo: "", shopAmount: 0, optAmount: 0 })),
   accounts: [],
   otherAdjustments: [],
   returns_mop: 0,
@@ -59,16 +54,11 @@ const blankShopShift = (): DailyCashup["shop"] => ({
   attendantName: '',
 });
 
-const blankOptShift = (): DailyCashup["opt"] => ({
+const blankOptShift = (terminals: string[]): DailyCashup["opt"] => ({
   income: 0,
   returns: 0,
   returns_today: 0,
-  speedpoints: [
-    { terminal: "Term 247608", batchNo: "", shopAmount: 0, optAmount: 0 },
-    { terminal: "Forecourt 929661", batchNo: "", shopAmount: 0, optAmount: 0 },
-    { terminal: "V Plus", batchNo: "", shopAmount: 0, optAmount: 0 },
-    { terminal: "Scan to pay", batchNo: "", shopAmount: 0, optAmount: 0 },
-  ],
+  speedpoints: terminals.map((terminal) => ({ terminal, batchNo: "", shopAmount: 0, optAmount: 0 })),
   accounts: [],
 });
 
