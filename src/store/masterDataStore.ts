@@ -50,6 +50,7 @@ interface MasterDataStore {
   managerNames: string[];
   categories: string[];
   tanks: TankDescription[];
+  speedpointTerminals: SpeedpointTerminal[];
   loaded: boolean;
 
   loadAll: () => Promise<void>;
@@ -81,6 +82,10 @@ interface MasterDataStore {
   addTank: (tank: TankDescription) => void;
   updateTank: (index: number, tank: TankDescription) => void;
   deleteTank: (index: number) => void;
+
+  addSpeedpointTerminal: (term: SpeedpointTerminal) => void;
+  updateSpeedpointTerminal: (oldName: string, term: SpeedpointTerminal) => Promise<{ renamedRows: number }>;
+  deleteSpeedpointTerminal: (name: string) => Promise<{ ok: boolean; usedIn?: string }>;
 }
 
 const replace = (list: string[], old: string, next: string) =>
