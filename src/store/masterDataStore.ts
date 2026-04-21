@@ -17,6 +17,25 @@ export interface TankDescription {
   color: string; // hex color for reports/recons
 }
 
+export type SpeedpointShift = 'shop' | 'opt' | 'both';
+
+export interface SpeedpointTerminal {
+  /** Display name, e.g. "Term 247608" */
+  name: string;
+  /** Which cashier shift sections this terminal appears in */
+  shift: SpeedpointShift;
+  /** Text/regex pattern matched against bank-statement descriptions */
+  bankPattern: string;
+}
+
+const DEFAULT_SPEEDPOINT_TERMINALS: SpeedpointTerminal[] = [
+  { name: 'Term 247608',       shift: 'both', bankPattern: '247608' },
+  { name: 'Forecourt 929661',  shift: 'both', bankPattern: '929661' },
+  { name: 'Retail 200660',     shift: 'shop', bankPattern: '200660' },
+  { name: 'V Plus',            shift: 'opt',  bankPattern: '' },
+  { name: 'Scan to pay',       shift: 'both', bankPattern: '' },
+];
+
 /** Look up tank color by gradeId (tank number) or grade description */
 export function getTankColor(tanks: TankDescription[], gradeIdOrDesc: string): string | undefined {
   const t = tanks.find(t => t.tankNumber === gradeIdOrDesc || t.grade.toLowerCase() === gradeIdOrDesc.toLowerCase());
