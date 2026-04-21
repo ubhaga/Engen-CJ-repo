@@ -558,9 +558,14 @@ export function Reports({ mode = 'reports', onNavigateToDate }: { mode?: 'report
   const invoiceTotal = invoiceReport.reduce((s, r) => s + r.inclusive, 0);
   const invoiceVatTotal = invoiceReport.reduce((s, r) => s + r.vat, 0);
 
-  // MOP report — Cash (CC) uses cashConnectTotal from section 5 MOP Cash
+  // MOP report — Cash (CC) uses cashConnectTotal from section 5 MOP Cash.
+  // Speedpoints split: terminals with a bankPattern roll into Shop/OPT speedpoint columns;
+  // Scan to pay and V Plus get their own dedicated columns (special instruments).
+  const SPECIAL_TERMINALS = new Set(['Scan to pay', 'V Plus']);
   const mopReport = monthCashups.map(c => {
-    const spTerminals = ['Term 247608', 'Forecourt 929661', 'Retail 200660'];
+    const spTerminals = speedpointTerminals
+      .filter(t => t.bankPattern.trim() !== '' && !SPECIAL_TERMINALS.has(t.name))
+      .map(t => t.name);
     const shopSP = c.shop.speedpoints.filter(sp => spTerminals.includes(sp.terminal)).reduce((s, sp) => s + sp.shopAmount, 0);
     const optSP = c.opt.speedpoints.filter(sp => spTerminals.includes(sp.terminal)).reduce((s, sp) => s + sp.optAmount, 0);
     const scanToPay = c.shop.speedpoints.filter(sp => sp.terminal === 'Scan to pay').reduce((s, sp) => s + sp.shopAmount, 0)
