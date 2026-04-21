@@ -289,6 +289,23 @@ export function BankStatementTab({ filterMonth, monthLabel }: Props) {
         </div>
       </div>
 
+      {terminalFilter && (
+        <div className="border-b px-4 py-2 bg-primary/5 flex items-center justify-between text-xs">
+          <span>
+            Filtered by terminal pattern <span className="font-mono font-semibold">{terminalFilter.pattern}</span>
+            {terminalFilter.label !== terminalFilter.pattern && <> ({terminalFilter.label})</>}
+            {' '}— showing <span className="font-semibold">{visibleLines.length}</span> of {lines.length} lines,
+            total <CurrencyDisplay value={visibleTotal} />
+          </span>
+          <button
+            onClick={() => setTerminalFilter(null)}
+            className="flex items-center gap-1 text-primary hover:text-primary/70"
+          >
+            <X className="h-3 w-3" /> Clear filter
+          </button>
+        </div>
+      )}
+
       {lines.length > 0 && (
         <div className="border-b p-4">
           <h4 className="text-sm font-semibold mb-2">Terminal Matching Summary</h4>
