@@ -225,8 +225,13 @@ export function AfsMonthly({ selectedDate }: AfsMonthlyProps) {
   }, [month, cashups, managerEntries]);
 
   // ── Balance Sheet: EFT Clearing (Speedpoint recon TOTAL diff per terminal) ──
+  // SP_TERMINALS comes from Settings → Speedpoint Terminals; only terminals with a
+  // configured bank-statement match pattern participate in the EFT recon.
+  const SP_TERMINALS = useMemo(
+    () => speedpointTerminals.filter(t => t.bankPattern.trim() !== '').map(t => t.name),
+    [speedpointTerminals]
+  );
   const eftClearing = useMemo(() => {
-    const SP_TERMINALS = ['Term 247608', 'Forecourt 929661', 'Retail 200660', 'Scan to pay'];
     const monthlyCashups = cashups.filter((c) => c.month === month);
     const prevMonthCashups = cashups.filter((c) => c.month === prevMonth);
 
