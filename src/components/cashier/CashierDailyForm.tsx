@@ -33,7 +33,6 @@ import { extractDayEndDebtors } from "@/lib/dayEndDebtors";
 
 const DAY_END_PAYOUTS_CUTOFF = "2026-04-01";
 const DAY_END_PAYOUT_VENDOR = "Day End Payouts";
-const DAY_END_DEBTORS_CUTOFF = "2026-04-01";
 
 const blankShopShift = (terminals: string[]): DailyCashup["shop"] => ({
   income: 0,
@@ -210,14 +209,12 @@ export function CashierDailyForm({ selectedDate, onDateChange }: Props) {
   // from the uploaded day-end report's "EOD Debtors Transactions" section.
   // Lines remain editable; re-uploading the .rpt re-syncs them.
   // Unknown account names are added to Master Data automatically.
-  const useDayEndDebtors = selectedDate >= DAY_END_DEBTORS_CUTOFF;
   const addAccountToMaster = useMasterDataStore(s => s.addAccount);
   const masterAccounts = useMasterDataStore(s => s.accounts);
   // Track the upload's updated_at so we re-sync only when the report changes.
   const lastSyncedRef = useRef<{ date: string; updatedAt: string } | null>(null);
 
   useEffect(() => {
-    if (!useDayEndDebtors) return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -259,7 +256,7 @@ export function CashierDailyForm({ selectedDate, onDateChange }: Props) {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, useDayEndDebtors, existing?.id]);
+  }, [selectedDate, existing?.id]);
   // ---- CALCULATIONS ----
   const shopPayoutsTotal = form.shop.payouts.reduce((s, p) => s + p.amount, 0);
   const shopNetSales = form.shop.income - form.shop.returns - form.shop.returns_today;
