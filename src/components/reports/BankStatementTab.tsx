@@ -396,8 +396,12 @@ export function BankStatementTab({ filterMonth, monthLabel }: Props) {
                 </TableRow>
               ))}
               <TableRow className="bg-secondary font-semibold">
-                <TableCell colSpan={2}>TOTAL ({lines.length} lines)</TableCell>
-                <TableCell className="text-right"><CurrencyDisplay value={grandTotal} highlight /></TableCell>
+                <TableCell colSpan={2}>
+                  TOTAL ({visibleLines.length}{terminalFilter ? ` of ${lines.length}` : ''} lines)
+                </TableCell>
+                <TableCell className="text-right">
+                  <CurrencyDisplay value={terminalFilter ? visibleTotal : grandTotal} highlight />
+                </TableCell>
                 <TableCell colSpan={3}></TableCell>
               </TableRow>
             </>
