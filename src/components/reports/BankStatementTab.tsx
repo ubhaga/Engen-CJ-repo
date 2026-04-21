@@ -1,19 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useMasterDataStore } from '@/store/masterDataStore';
 import { CurrencyDisplay } from '@/components/ui/CashupUI';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Trash2, Download } from 'lucide-react';
+import { Upload, Trash2, Download, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBankAllocations } from '@/hooks/useBankAllocations';
-
-const TERMINAL_PATTERNS: { pattern: RegExp; terminal: string }[] = [
-  { pattern: /247608/, terminal: 'Term 247608' },
-  { pattern: /929661/, terminal: 'Forecourt 929661' },
-  { pattern: /200660/, terminal: 'Retail 200660' },
-];
 
 const DEBTOR_ACCOUNTS = [
   'Mahindra', 'Lancaster Pharmacy', 'Hyde Park Toyota', 'Hltc', 'St Theresas',
