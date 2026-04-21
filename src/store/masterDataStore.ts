@@ -17,6 +17,25 @@ export interface TankDescription {
   color: string; // hex color for reports/recons
 }
 
+export type SpeedpointShift = 'shop' | 'opt' | 'both';
+
+export interface SpeedpointTerminal {
+  /** Display name, e.g. "Term 247608" */
+  name: string;
+  /** Which cashier shift sections this terminal appears in */
+  shift: SpeedpointShift;
+  /** Text/regex pattern matched against bank-statement descriptions */
+  bankPattern: string;
+}
+
+const DEFAULT_SPEEDPOINT_TERMINALS: SpeedpointTerminal[] = [
+  { name: 'Term 247608',       shift: 'both', bankPattern: '247608' },
+  { name: 'Forecourt 929661',  shift: 'both', bankPattern: '929661' },
+  { name: 'Retail 200660',     shift: 'shop', bankPattern: '200660' },
+  { name: 'V Plus',            shift: 'opt',  bankPattern: '' },
+  { name: 'Scan to pay',       shift: 'both', bankPattern: '' },
+];
+
 /** Look up tank color by gradeId (tank number) or grade description */
 export function getTankColor(tanks: TankDescription[], gradeIdOrDesc: string): string | undefined {
   const t = tanks.find(t => t.tankNumber === gradeIdOrDesc || t.grade.toLowerCase() === gradeIdOrDesc.toLowerCase());
@@ -31,6 +50,7 @@ interface MasterDataStore {
   managerNames: string[];
   categories: string[];
   tanks: TankDescription[];
+  speedpointTerminals: SpeedpointTerminal[];
   loaded: boolean;
 
   loadAll: () => Promise<void>;
@@ -62,6 +82,10 @@ interface MasterDataStore {
   addTank: (tank: TankDescription) => void;
   updateTank: (index: number, tank: TankDescription) => void;
   deleteTank: (index: number) => void;
+
+  addSpeedpointTerminal: (term: SpeedpointTerminal) => void;
+  updateSpeedpointTerminal: (oldName: string, term: SpeedpointTerminal) => Promise<{ renamedRows: number }>;
+  deleteSpeedpointTerminal: (name: string) => Promise<{ ok: boolean; usedIn?: string }>;
 }
 
 const replace = (list: string[], old: string, next: string) =>
@@ -82,23 +106,29 @@ export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
   managerNames: [...DEFAULT_MANAGER_NAMES],
   categories: [...DEFAULT_CATEGORIES].sort(),
   tanks: [] as TankDescription[],
+  speedpointTerminals: [...DEFAULT_SPEEDPOINT_TERMINALS],
   loaded: false,
 
   loadAll: async () => {
     const { data } = await supabase.from('master_data').select('*');
     if (data && data.length > 0) {
-      const map: Record<string, string[]> = {};
-      data.forEach((r: { key: string; data: unknown }) => { map[r.key] = r.data as string[]; });
+      const map: Record<string, unknown> = {};
+      data.forEach((r: { key: string; data: unknown }) => { map[r.key] = r.data; });
       set({
-        payoutSuppliers: map.payoutSuppliers ?? get().payoutSuppliers,
-        eftSuppliers: map.eftSuppliers ?? get().eftSuppliers,
-        accounts: map.accounts ?? get().accounts,
-        cashierNames: map.cashierNames ?? get().cashierNames,
-        managerNames: map.managerNames ?? get().managerNames,
-        categories: map.categories ?? get().categories,
-        tanks: (map.tanks as unknown as TankDescription[]) ?? get().tanks,
+        payoutSuppliers: (map.payoutSuppliers as string[]) ?? get().payoutSuppliers,
+        eftSuppliers: (map.eftSuppliers as string[]) ?? get().eftSuppliers,
+        accounts: (map.accounts as string[]) ?? get().accounts,
+        cashierNames: (map.cashierNames as string[]) ?? get().cashierNames,
+        managerNames: (map.managerNames as string[]) ?? get().managerNames,
+        categories: (map.categories as string[]) ?? get().categories,
+        tanks: (map.tanks as TankDescription[]) ?? get().tanks,
+        speedpointTerminals: (map.speedpointTerminals as SpeedpointTerminal[]) ?? get().speedpointTerminals,
         loaded: true,
       });
+      // Seed speedpointTerminals for existing installs that pre-date this key
+      if (!map.speedpointTerminals) {
+        await persistKey('speedpointTerminals', get().speedpointTerminals);
+      }
     } else {
       // First time: seed defaults to DB
       const state = get();
@@ -109,6 +139,7 @@ export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
         persistKey('cashierNames', state.cashierNames),
         persistKey('managerNames', state.managerNames),
         persistKey('categories', state.categories),
+        persistKey('speedpointTerminals', state.speedpointTerminals),
       ]);
       set({ loaded: true });
     }
@@ -267,5 +298,89 @@ export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
       persistKey('tanks', next);
       return { tanks: next };
     });
+  },
+
+  addSpeedpointTerminal: (term) => {
+    set(s => {
+      if (s.speedpointTerminals.some(t => t.name.toLowerCase() === term.name.toLowerCase())) {
+        return {};
+      }
+      const next = [...s.speedpointTerminals, term];
+      persistKey('speedpointTerminals', next);
+      return { speedpointTerminals: next };
+    });
+  },
+
+  updateSpeedpointTerminal: async (oldName, term) => {
+    const state = get();
+    const next = state.speedpointTerminals.map(t => (t.name === oldName ? term : t));
+    set({ speedpointTerminals: next });
+    await persistKey('speedpointTerminals', next);
+
+    let renamedRows = 0;
+    if (oldName !== term.name) {
+      const { data: cashups } = await supabase
+        .from('daily_cashups')
+        .select('id, shop, opt');
+      if (cashups) {
+        for (const c of cashups as Array<{ id: string; shop: { speedpoints?: Array<{ terminal: string }> }; opt: { speedpoints?: Array<{ terminal: string }> } }>) {
+          let touched = false;
+          const shopSp = c.shop?.speedpoints?.map(sp => {
+            if (sp.terminal === oldName) { touched = true; return { ...sp, terminal: term.name }; }
+            return sp;
+          });
+          const optSp = c.opt?.speedpoints?.map(sp => {
+            if (sp.terminal === oldName) { touched = true; return { ...sp, terminal: term.name }; }
+            return sp;
+          });
+          if (touched) {
+            await supabase
+              .from('daily_cashups')
+              .update({ shop: { ...c.shop, speedpoints: shopSp }, opt: { ...c.opt, speedpoints: optSp } } as never)
+              .eq('id', c.id);
+            renamedRows++;
+          }
+        }
+      }
+      await supabase
+        .from('bank_statement_lines')
+        .update({ matched_terminal: term.name } as never)
+        .eq('matched_terminal', oldName);
+      await supabase
+        .from('speedpoint_manual_matches')
+        .update({ terminal: term.name } as never)
+        .eq('terminal', oldName);
+      await supabase
+        .from('speedpoint_diff_clearances')
+        .update({ terminal: term.name } as never)
+        .eq('terminal', oldName);
+    }
+    return { renamedRows };
+  },
+
+  deleteSpeedpointTerminal: async (name) => {
+    const [cashups, bankLines, matches] = await Promise.all([
+      supabase.from('daily_cashups').select('shop, opt'),
+      supabase.from('bank_statement_lines').select('id', { count: 'exact', head: true }).eq('matched_terminal', name),
+      supabase.from('speedpoint_manual_matches').select('id', { count: 'exact', head: true }).eq('terminal', name),
+    ]);
+    let cashupHits = 0;
+    if (cashups.data) {
+      for (const c of cashups.data as Array<{ shop: { speedpoints?: Array<{ terminal: string; shopAmount?: number; optAmount?: number; batchNo?: string }> }; opt: { speedpoints?: Array<{ terminal: string; shopAmount?: number; optAmount?: number; batchNo?: string }> } }>) {
+        const used = [
+          ...(c.shop?.speedpoints ?? []),
+          ...(c.opt?.speedpoints ?? []),
+        ].some(sp => sp.terminal === name && ((sp.shopAmount ?? 0) !== 0 || (sp.optAmount ?? 0) !== 0 || (sp.batchNo ?? '').trim() !== ''));
+        if (used) cashupHits++;
+      }
+    }
+    if (cashupHits > 0) return { ok: false, usedIn: `${cashupHits} cashup(s)` };
+    if ((bankLines.count ?? 0) > 0) return { ok: false, usedIn: `${bankLines.count} bank line(s)` };
+    if ((matches.count ?? 0) > 0) return { ok: false, usedIn: `${matches.count} manual match(es)` };
+
+    const next = get().speedpointTerminals.filter(t => t.name !== name);
+    set({ speedpointTerminals: next });
+    await persistKey('speedpointTerminals', next);
+    return { ok: true };
   },
 }));

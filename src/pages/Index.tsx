@@ -49,6 +49,22 @@ export default function Index() {
     if (!masterLoaded) loadMaster();
   }, []);
 
+  // Cross-tab navigation requested by other components (e.g. Settings → Bank Statement link)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ tab?: string; subtab?: string }>).detail;
+      if (!detail) return;
+      if (detail.tab === 'bank' || detail.subtab === 'bank') {
+        setActiveTab('uploads');
+        setUploadsSubTab('bank');
+      } else if (detail.tab) {
+        setActiveTab(detail.tab);
+      }
+    };
+    window.addEventListener('lovable:nav', handler as EventListener);
+    return () => window.removeEventListener('lovable:nav', handler as EventListener);
+  }, []);
+
   if (!cashupLoaded || !masterLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">

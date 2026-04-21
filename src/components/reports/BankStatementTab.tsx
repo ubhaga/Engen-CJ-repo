@@ -1,19 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useMasterDataStore } from '@/store/masterDataStore';
 import { CurrencyDisplay } from '@/components/ui/CashupUI';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Trash2, Download } from 'lucide-react';
+import { Upload, Trash2, Download, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBankAllocations } from '@/hooks/useBankAllocations';
-
-const TERMINAL_PATTERNS: { pattern: RegExp; terminal: string }[] = [
-  { pattern: /247608/, terminal: 'Term 247608' },
-  { pattern: /929661/, terminal: 'Forecourt 929661' },
-  { pattern: /200660/, terminal: 'Retail 200660' },
-];
 
 const DEBTOR_ACCOUNTS = [
   'Mahindra', 'Lancaster Pharmacy', 'Hyde Park Toyota', 'Hltc', 'St Theresas',
@@ -41,8 +35,38 @@ interface Props {
 export function BankStatementTab({ filterMonth, monthLabel }: Props) {
   const [lines, setLines] = useState<BankLine[]>([]);
   const [loading, setLoading] = useState(false);
-  const { eftSuppliers, accounts } = useMasterDataStore();
+  const { eftSuppliers, accounts, speedpointTerminals } = useMasterDataStore();
   const { allocations, upsert: upsertAllocation } = useBankAllocations(filterMonth);
+
+  // Optional URL/sessionStorage filter (set when user clicks the bank link from Settings).
+  const [terminalFilter, setTerminalFilter] = useState<{ pattern: string; label: string } | null>(null);
+  useEffect(() => {
+    try {
+      const pattern = sessionStorage.getItem('bank_filter_pattern');
+      const label = sessionStorage.getItem('bank_filter_label');
+      if (pattern) {
+        setTerminalFilter({ pattern, label: label || pattern });
+        sessionStorage.removeItem('bank_filter_pattern');
+        sessionStorage.removeItem('bank_filter_label');
+      }
+    } catch {
+      // noop
+    }
+  }, [filterMonth]);
+
+  // Build runtime patterns from master data
+  const TERMINAL_PATTERNS = useMemo(
+    () =>
+      speedpointTerminals
+        .filter(t => t.bankPattern.trim() !== '')
+        .map(t => {
+          let pattern: RegExp;
+          try { pattern = new RegExp(t.bankPattern, 'i'); }
+          catch { pattern = new RegExp(t.bankPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); }
+          return { pattern, terminal: t.name };
+        }),
+    [speedpointTerminals]
+  );
 
   const loadLines = useCallback(async () => {
     const { data } = await supabase
@@ -198,6 +222,16 @@ export function BankStatementTab({ filterMonth, monthLabel }: Props) {
   const unmatchedTotal = unmatchedLines.reduce((s, l) => s + l.amount, 0);
   const grandTotal = lines.reduce((s, l) => s + l.amount, 0);
 
+  // When a terminal filter is active (from Settings), restrict the displayed rows.
+  const visibleLines = useMemo(() => {
+    if (!terminalFilter) return lines;
+    let re: RegExp;
+    try { re = new RegExp(terminalFilter.pattern, 'i'); }
+    catch { re = new RegExp(terminalFilter.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); }
+    return lines.filter(l => re.test(l.description));
+  }, [lines, terminalFilter]);
+  const visibleTotal = visibleLines.reduce((s, l) => s + l.amount, 0);
+
   const exportCSV = () => {
     const headers = ['Date', 'Description', 'Amount', 'Matched Terminal', 'Allocation'];
     const rows = lines.map(l => {
@@ -255,6 +289,23 @@ export function BankStatementTab({ filterMonth, monthLabel }: Props) {
         </div>
       </div>
 
+      {terminalFilter && (
+        <div className="border-b px-4 py-2 bg-primary/5 flex items-center justify-between text-xs">
+          <span>
+            Filtered by terminal pattern <span className="font-mono font-semibold">{terminalFilter.pattern}</span>
+            {terminalFilter.label !== terminalFilter.pattern && <> ({terminalFilter.label})</>}
+            {' '}— showing <span className="font-semibold">{visibleLines.length}</span> of {lines.length} lines,
+            total <CurrencyDisplay value={visibleTotal} />
+          </span>
+          <button
+            onClick={() => setTerminalFilter(null)}
+            className="flex items-center gap-1 text-primary hover:text-primary/70"
+          >
+            <X className="h-3 w-3" /> Clear filter
+          </button>
+        </div>
+      )}
+
       {lines.length > 0 && (
         <div className="border-b p-4">
           <h4 className="text-sm font-semibold mb-2">Terminal Matching Summary</h4>
@@ -287,9 +338,11 @@ export function BankStatementTab({ filterMonth, monthLabel }: Props) {
         <TableBody>
           {lines.length === 0 ? (
             <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No bank statement uploaded for this month.</TableCell></TableRow>
+          ) : visibleLines.length === 0 ? (
+            <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No lines match the active terminal filter.</TableCell></TableRow>
           ) : (
             <>
-              {lines.map(l => (
+              {visibleLines.map(l => (
                 <TableRow key={l.id} className={l.matched_terminal ? 'hover:bg-muted/30' : 'bg-muted/10 hover:bg-muted/30'}>
                   <TableCell className="text-sm font-mono">{l.transaction_date}</TableCell>
                   <TableCell className="text-sm max-w-[250px] truncate">{l.description}</TableCell>
@@ -343,8 +396,12 @@ export function BankStatementTab({ filterMonth, monthLabel }: Props) {
                 </TableRow>
               ))}
               <TableRow className="bg-secondary font-semibold">
-                <TableCell colSpan={2}>TOTAL ({lines.length} lines)</TableCell>
-                <TableCell className="text-right"><CurrencyDisplay value={grandTotal} highlight /></TableCell>
+                <TableCell colSpan={2}>
+                  TOTAL ({visibleLines.length}{terminalFilter ? ` of ${lines.length}` : ''} lines)
+                </TableCell>
+                <TableCell className="text-right">
+                  <CurrencyDisplay value={terminalFilter ? visibleTotal : grandTotal} highlight />
+                </TableCell>
                 <TableCell colSpan={3}></TableCell>
               </TableRow>
             </>

@@ -3,6 +3,7 @@ import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMasterDataStore, type TankDescription } from '@/store/masterDataStore';
 import { toast } from '@/hooks/use-toast';
+import { SpeedpointTerminalsSettings } from './SpeedpointTerminalsSettings';
 
 interface EditableListProps {
   title: string;
@@ -196,6 +197,14 @@ export function MasterDataSettings() {
             onDelete={item => store.deleteManagerName(item)}
           />
         </div>
+      </div>
+
+      {/* Speedpoint Terminals */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
+          Speedpoint Terminals
+        </h3>
+        <SpeedpointTerminalsSettings />
       </div>
 
       {/* Tank Descriptions */}
