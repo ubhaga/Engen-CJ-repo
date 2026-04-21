@@ -35,8 +35,38 @@ interface Props {
 export function BankStatementTab({ filterMonth, monthLabel }: Props) {
   const [lines, setLines] = useState<BankLine[]>([]);
   const [loading, setLoading] = useState(false);
-  const { eftSuppliers, accounts } = useMasterDataStore();
+  const { eftSuppliers, accounts, speedpointTerminals } = useMasterDataStore();
   const { allocations, upsert: upsertAllocation } = useBankAllocations(filterMonth);
+
+  // Optional URL/sessionStorage filter (set when user clicks the bank link from Settings).
+  const [terminalFilter, setTerminalFilter] = useState<{ pattern: string; label: string } | null>(null);
+  useEffect(() => {
+    try {
+      const pattern = sessionStorage.getItem('bank_filter_pattern');
+      const label = sessionStorage.getItem('bank_filter_label');
+      if (pattern) {
+        setTerminalFilter({ pattern, label: label || pattern });
+        sessionStorage.removeItem('bank_filter_pattern');
+        sessionStorage.removeItem('bank_filter_label');
+      }
+    } catch {
+      // noop
+    }
+  }, [filterMonth]);
+
+  // Build runtime patterns from master data
+  const TERMINAL_PATTERNS = useMemo(
+    () =>
+      speedpointTerminals
+        .filter(t => t.bankPattern.trim() !== '')
+        .map(t => {
+          let pattern: RegExp;
+          try { pattern = new RegExp(t.bankPattern, 'i'); }
+          catch { pattern = new RegExp(t.bankPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); }
+          return { pattern, terminal: t.name };
+        }),
+    [speedpointTerminals]
+  );
 
   const loadLines = useCallback(async () => {
     const { data } = await supabase
