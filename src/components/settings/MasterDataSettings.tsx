@@ -3,6 +3,7 @@ import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMasterDataStore, type TankDescription } from '@/store/masterDataStore';
 import { toast } from '@/hooks/use-toast';
+import { SpeedpointTerminalsSettings } from './SpeedpointTerminalsSettings';
 
 interface EditableListProps {
   title: string;
