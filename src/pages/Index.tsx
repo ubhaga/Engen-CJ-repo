@@ -43,11 +43,17 @@ export default function Index() {
   const loadCashups = useCashupStore((s) => s.loadAll);
   const masterLoaded = useMasterDataStore((s) => s.loaded);
   const loadMaster = useMasterDataStore((s) => s.loadAll);
+  const siteName = useMasterDataStore((s) => s.siteName);
 
   useEffect(() => {
     if (!cashupLoaded) loadCashups();
     if (!masterLoaded) loadMaster();
   }, []);
+
+  // Keep document title in sync with the site name from settings
+  useEffect(() => {
+    if (siteName) document.title = `${siteName} Daily Cashup`;
+  }, [siteName]);
 
   // Cross-tab navigation requested by other components (e.g. Settings → Bank Statement link)
   useEffect(() => {
