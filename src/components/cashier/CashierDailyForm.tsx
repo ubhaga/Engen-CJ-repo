@@ -79,10 +79,17 @@ function ColHeader({ left, right }: { left: string; right: string }) {
 
 export function CashierDailyForm({ selectedDate, onDateChange }: Props) {
   const { getCashupByDate, addCashup, updateCashup } = useCashupStore();
-  const { payoutSuppliers, accounts: ACCOUNTS, cashierNames: CASHIER_NAMES } = useMasterDataStore();
+  const { payoutSuppliers, accounts: ACCOUNTS, cashierNames: CASHIER_NAMES, speedpointTerminals } = useMasterDataStore();
   const SUPPLIERS = payoutSuppliers;
   const existing = getCashupByDate(selectedDate);
   const isLocked = selectedDate < "2026-01-01";
+
+  const shopTerminalNames = speedpointTerminals
+    .filter(t => t.shift === 'shop' || t.shift === 'both')
+    .map(t => t.name);
+  const optTerminalNames = speedpointTerminals
+    .filter(t => t.shift === 'opt' || t.shift === 'both')
+    .map(t => t.name);
 
   const [form, setForm] = useState<Omit<DailyCashup, "id">>(() => ({
     date: selectedDate,
@@ -91,8 +98,8 @@ export function CashierDailyForm({ selectedDate, onDateChange }: Props) {
     shopShiftNumber: 0,
     optShiftNumber: 0,
     cashierName: "",
-    shop: blankShopShift(),
-    opt: blankOptShift(),
+    shop: blankShopShift(shopTerminalNames),
+    opt: blankOptShift(optTerminalNames),
     notes: "",
     locked: false,
   }));
@@ -102,9 +109,30 @@ export function CashierDailyForm({ selectedDate, onDateChange }: Props) {
 
   useEffect(() => {
     if (existing) {
-      setForm({ ...existing });
+      // Merge existing cashup with any newly-added terminals so they appear
+      // in the form even if absent from the saved record.
+      const mergeTerminals = (
+        existingSp: SpeedpointEntry[],
+        wantedNames: string[]
+      ): SpeedpointEntry[] => {
+        const byName = new Map(existingSp.map(sp => [sp.terminal, sp]));
+        const merged = wantedNames.map(name =>
+          byName.get(name) ?? { terminal: name, batchNo: "", shopAmount: 0, optAmount: 0 }
+        );
+        // Preserve any historical terminals that no longer exist in master data
+        // so old data doesn't disappear silently.
+        existingSp.forEach(sp => {
+          if (!wantedNames.includes(sp.terminal)) merged.push(sp);
+        });
+        return merged;
+      };
+      setForm({
+        ...existing,
+        shop: { ...existing.shop, speedpoints: mergeTerminals(existing.shop.speedpoints, shopTerminalNames) },
+        opt: { ...existing.opt, speedpoints: mergeTerminals(existing.opt.speedpoints, optTerminalNames) },
+      });
     } else {
-      const shopBase = blankShopShift();
+      const shopBase = blankShopShift(shopTerminalNames);
       // Seed Jan 1 2026 MOP Cash from spreadsheet (Daily Cashup row)
       if (selectedDate === "2026-01-01") {
         shopBase.coins = 54;
@@ -117,11 +145,12 @@ export function CashierDailyForm({ selectedDate, onDateChange }: Props) {
         date: selectedDate,
         month: selectedDate.slice(0, 7),
         shop: shopBase,
-        opt: blankOptShift(),
+        opt: blankOptShift(optTerminalNames),
       }));
     }
     setSavedAt(null);
-  }, [selectedDate, existing?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, existing?.id, speedpointTerminals.length]);
 
   const setShop = (patch: Partial<typeof form.shop>) => setForm((f) => ({ ...f, shop: { ...f.shop, ...patch } }));
   const setOpt = (patch: Partial<typeof form.opt>) => setForm((f) => ({ ...f, opt: { ...f.opt, ...patch } }));
