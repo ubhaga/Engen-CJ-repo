@@ -199,6 +199,14 @@ export function MasterDataSettings() {
         </div>
       </div>
 
+      {/* Speedpoint Terminals */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
+          Speedpoint Terminals
+        </h3>
+        <SpeedpointTerminalsSettings />
+      </div>
+
       {/* Tank Descriptions */}
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
