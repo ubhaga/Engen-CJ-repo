@@ -106,23 +106,29 @@ export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
   managerNames: [...DEFAULT_MANAGER_NAMES],
   categories: [...DEFAULT_CATEGORIES].sort(),
   tanks: [] as TankDescription[],
+  speedpointTerminals: [...DEFAULT_SPEEDPOINT_TERMINALS],
   loaded: false,
 
   loadAll: async () => {
     const { data } = await supabase.from('master_data').select('*');
     if (data && data.length > 0) {
-      const map: Record<string, string[]> = {};
-      data.forEach((r: { key: string; data: unknown }) => { map[r.key] = r.data as string[]; });
+      const map: Record<string, unknown> = {};
+      data.forEach((r: { key: string; data: unknown }) => { map[r.key] = r.data; });
       set({
-        payoutSuppliers: map.payoutSuppliers ?? get().payoutSuppliers,
-        eftSuppliers: map.eftSuppliers ?? get().eftSuppliers,
-        accounts: map.accounts ?? get().accounts,
-        cashierNames: map.cashierNames ?? get().cashierNames,
-        managerNames: map.managerNames ?? get().managerNames,
-        categories: map.categories ?? get().categories,
-        tanks: (map.tanks as unknown as TankDescription[]) ?? get().tanks,
+        payoutSuppliers: (map.payoutSuppliers as string[]) ?? get().payoutSuppliers,
+        eftSuppliers: (map.eftSuppliers as string[]) ?? get().eftSuppliers,
+        accounts: (map.accounts as string[]) ?? get().accounts,
+        cashierNames: (map.cashierNames as string[]) ?? get().cashierNames,
+        managerNames: (map.managerNames as string[]) ?? get().managerNames,
+        categories: (map.categories as string[]) ?? get().categories,
+        tanks: (map.tanks as TankDescription[]) ?? get().tanks,
+        speedpointTerminals: (map.speedpointTerminals as SpeedpointTerminal[]) ?? get().speedpointTerminals,
         loaded: true,
       });
+      // Seed speedpointTerminals for existing installs that pre-date this key
+      if (!map.speedpointTerminals) {
+        await persistKey('speedpointTerminals', get().speedpointTerminals);
+      }
     } else {
       // First time: seed defaults to DB
       const state = get();
@@ -133,6 +139,7 @@ export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
         persistKey('cashierNames', state.cashierNames),
         persistKey('managerNames', state.managerNames),
         persistKey('categories', state.categories),
+        persistKey('speedpointTerminals', state.speedpointTerminals),
       ]);
       set({ loaded: true });
     }
