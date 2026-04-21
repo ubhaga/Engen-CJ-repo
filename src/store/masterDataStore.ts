@@ -299,4 +299,88 @@ export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
       return { tanks: next };
     });
   },
+
+  addSpeedpointTerminal: (term) => {
+    set(s => {
+      if (s.speedpointTerminals.some(t => t.name.toLowerCase() === term.name.toLowerCase())) {
+        return {};
+      }
+      const next = [...s.speedpointTerminals, term];
+      persistKey('speedpointTerminals', next);
+      return { speedpointTerminals: next };
+    });
+  },
+
+  updateSpeedpointTerminal: async (oldName, term) => {
+    const state = get();
+    const next = state.speedpointTerminals.map(t => (t.name === oldName ? term : t));
+    set({ speedpointTerminals: next });
+    await persistKey('speedpointTerminals', next);
+
+    let renamedRows = 0;
+    if (oldName !== term.name) {
+      const { data: cashups } = await supabase
+        .from('daily_cashups')
+        .select('id, shop, opt');
+      if (cashups) {
+        for (const c of cashups as Array<{ id: string; shop: { speedpoints?: Array<{ terminal: string }> }; opt: { speedpoints?: Array<{ terminal: string }> } }>) {
+          let touched = false;
+          const shopSp = c.shop?.speedpoints?.map(sp => {
+            if (sp.terminal === oldName) { touched = true; return { ...sp, terminal: term.name }; }
+            return sp;
+          });
+          const optSp = c.opt?.speedpoints?.map(sp => {
+            if (sp.terminal === oldName) { touched = true; return { ...sp, terminal: term.name }; }
+            return sp;
+          });
+          if (touched) {
+            await supabase
+              .from('daily_cashups')
+              .update({ shop: { ...c.shop, speedpoints: shopSp }, opt: { ...c.opt, speedpoints: optSp } } as never)
+              .eq('id', c.id);
+            renamedRows++;
+          }
+        }
+      }
+      await supabase
+        .from('bank_statement_lines')
+        .update({ matched_terminal: term.name } as never)
+        .eq('matched_terminal', oldName);
+      await supabase
+        .from('speedpoint_manual_matches')
+        .update({ terminal: term.name } as never)
+        .eq('terminal', oldName);
+      await supabase
+        .from('speedpoint_diff_clearances')
+        .update({ terminal: term.name } as never)
+        .eq('terminal', oldName);
+    }
+    return { renamedRows };
+  },
+
+  deleteSpeedpointTerminal: async (name) => {
+    const [cashups, bankLines, matches] = await Promise.all([
+      supabase.from('daily_cashups').select('shop, opt'),
+      supabase.from('bank_statement_lines').select('id', { count: 'exact', head: true }).eq('matched_terminal', name),
+      supabase.from('speedpoint_manual_matches').select('id', { count: 'exact', head: true }).eq('terminal', name),
+    ]);
+    let cashupHits = 0;
+    if (cashups.data) {
+      for (const c of cashups.data as Array<{ shop: { speedpoints?: Array<{ terminal: string; shopAmount?: number; optAmount?: number; batchNo?: string }> }; opt: { speedpoints?: Array<{ terminal: string; shopAmount?: number; optAmount?: number; batchNo?: string }> } }>) {
+        const used = [
+          ...(c.shop?.speedpoints ?? []),
+          ...(c.opt?.speedpoints ?? []),
+        ].some(sp => sp.terminal === name && ((sp.shopAmount ?? 0) !== 0 || (sp.optAmount ?? 0) !== 0 || (sp.batchNo ?? '').trim() !== ''));
+        if (used) cashupHits++;
+      }
+    }
+    if (cashupHits > 0) return { ok: false, usedIn: `${cashupHits} cashup(s)` };
+    if ((bankLines.count ?? 0) > 0) return { ok: false, usedIn: `${bankLines.count} bank line(s)` };
+    if ((matches.count ?? 0) > 0) return { ok: false, usedIn: `${matches.count} manual match(es)` };
+
+    const next = get().speedpointTerminals.filter(t => t.name !== name);
+    set({ speedpointTerminals: next });
+    await persistKey('speedpointTerminals', next);
+    return { ok: true };
+  },
 }));
