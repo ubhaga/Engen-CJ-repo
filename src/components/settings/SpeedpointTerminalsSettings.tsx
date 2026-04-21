@@ -199,20 +199,18 @@ export function SpeedpointTerminalsSettings() {
   const shopTerminals = store.speedpointTerminals.filter(t => t.shift === 'shop' || t.shift === 'both');
   const optTerminals = store.speedpointTerminals.filter(t => t.shift === 'opt' || t.shift === 'both');
 
-  // When user clicks the bank-link icon, jump to Reports → Bank tab and pre-filter by pattern
+  // When user clicks the bank-link icon, jump to Uploads → Bank tab and pre-filter by pattern
   const handleOpenBank = (pattern: string, terminalName: string) => {
     try {
-      sessionStorage.setItem('reports_open_tab', 'bank');
       sessionStorage.setItem('bank_filter_pattern', pattern);
       sessionStorage.setItem('bank_filter_label', terminalName);
     } catch {
       // noop
     }
-    // Trigger main-nav tab switch to Reports
-    window.dispatchEvent(new CustomEvent('lovable:nav', { detail: { tab: 'reports', subtab: 'bank', pattern, label: terminalName } }));
+    window.dispatchEvent(new CustomEvent('lovable:nav', { detail: { tab: 'uploads', subtab: 'bank' } }));
     toast({
-      title: 'Open Bank Statement',
-      description: `Switching to Bank tab filtered by "${pattern}" (${terminalName}).`,
+      title: 'Bank Statement',
+      description: `Showing lines matching "${pattern}" (${terminalName}).`,
     });
   };
 
