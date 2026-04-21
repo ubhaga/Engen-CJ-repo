@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMasterDataStore, type TankDescription } from '@/store/masterDataStore';
@@ -123,6 +123,21 @@ function EditableList({ title, color, items, onAdd, onUpdate, onDelete }: Editab
 
 export function MasterDataSettings() {
   const store = useMasterDataStore();
+  const [siteNameDraft, setSiteNameDraft] = useState(store.siteName);
+
+  // Keep draft in sync if store updates externally (e.g. after loadAll)
+  useEffect(() => { setSiteNameDraft(store.siteName); }, [store.siteName]);
+
+  const saveSiteName = () => {
+    const trimmed = siteNameDraft.trim();
+    if (!trimmed) {
+      toast({ title: 'Site name required', variant: 'destructive' });
+      return;
+    }
+    if (trimmed === store.siteName) return;
+    store.setSiteName(trimmed);
+    toast({ title: 'Site name updated', description: `Now showing "${trimmed}".` });
+  };
 
   return (
     <div className="space-y-6">
@@ -131,6 +146,35 @@ export function MasterDataSettings() {
         <p className="text-xs text-muted-foreground mt-0.5">
           Manage the lists used across the cashup forms. Hover over an item to edit or delete it.
         </p>
+      </div>
+
+      {/* Site Name */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
+          Site Name
+        </h3>
+        <div className="border rounded-lg overflow-hidden max-w-2xl">
+          <div className="bg-slate-700 text-white px-4 py-2.5 font-semibold text-sm">
+            Site / Branch Name
+          </div>
+          <div className="p-3 bg-muted/20 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Used in the page header, browser tab title, and anywhere the site is referenced.
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={siteNameDraft}
+                onChange={e => setSiteNameDraft(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveSiteName()}
+                placeholder="e.g. Shell Craighall"
+                className="flex-1 text-sm border border-input rounded-md px-3 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <Button size="sm" onClick={saveSiteName} className="shrink-0" disabled={siteNameDraft.trim() === store.siteName}>
+                <Check className="h-3.5 w-3.5 mr-1" /> Save
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Section 1.1 & 1.2 — Invoice Tables */}

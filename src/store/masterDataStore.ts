@@ -43,6 +43,7 @@ export function getTankColor(tanks: TankDescription[], gradeIdOrDesc: string): s
 }
 
 interface MasterDataStore {
+  siteName: string;
   payoutSuppliers: string[];
   eftSuppliers: string[];
   accounts: string[];
@@ -54,6 +55,8 @@ interface MasterDataStore {
   loaded: boolean;
 
   loadAll: () => Promise<void>;
+
+  setSiteName: (name: string) => void;
 
   addPayoutSupplier: (name: string) => void;
   updatePayoutSupplier: (old: string, next: string) => void;
@@ -99,6 +102,7 @@ async function persistKey(key: string, data: unknown) {
 }
 
 export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
+  siteName: 'Shell Craighall',
   payoutSuppliers: [...SUPPLIERS].sort(),
   eftSuppliers: DEFAULT_EFT_SUPPLIERS,
   accounts: [...DEFAULT_ACCOUNTS],
@@ -115,6 +119,7 @@ export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
       const map: Record<string, unknown> = {};
       data.forEach((r: { key: string; data: unknown }) => { map[r.key] = r.data; });
       set({
+        siteName: (map.siteName as string) ?? get().siteName,
         payoutSuppliers: (map.payoutSuppliers as string[]) ?? get().payoutSuppliers,
         eftSuppliers: (map.eftSuppliers as string[]) ?? get().eftSuppliers,
         accounts: (map.accounts as string[]) ?? get().accounts,
@@ -129,10 +134,15 @@ export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
       if (!map.speedpointTerminals) {
         await persistKey('speedpointTerminals', get().speedpointTerminals);
       }
+      // Seed siteName for existing installs that pre-date this key
+      if (!map.siteName) {
+        await persistKey('siteName', get().siteName);
+      }
     } else {
       // First time: seed defaults to DB
       const state = get();
       await Promise.all([
+        persistKey('siteName', state.siteName),
         persistKey('payoutSuppliers', state.payoutSuppliers),
         persistKey('eftSuppliers', state.eftSuppliers),
         persistKey('accounts', state.accounts),
@@ -143,6 +153,12 @@ export const useMasterDataStore = create<MasterDataStore>()((set, get) => ({
       ]);
       set({ loaded: true });
     }
+  },
+
+  setSiteName: (name) => {
+    const trimmed = name.trim() || 'Site';
+    set({ siteName: trimmed });
+    persistKey('siteName', trimmed);
   },
 
   addPayoutSupplier: (name) => {
